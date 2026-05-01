@@ -1,71 +1,13 @@
 export const dynamic = 'force-dynamic'
 
-import { getClient } from '@/graphql/apolloClient'
-import { gql } from '@apollo/client'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { Listing } from '@/types'
+import { fetchListingSSR } from '@/lib/queries/serverListings'
 import { TrustBadge } from '@/components/trust/TrustBadge'
 import { TrustSignalList } from '@/components/trust/TrustSignalList'
 import { ReviewList } from '@/components/reviews/ReviewList'
 import { ReviewSummary } from '@/components/reviews/ReviewSummary'
 import Link from 'next/link'
-
-const LISTING_QUERY = gql`
-  query Listing($id: ID!) {
-    listing(id: $id) {
-      id
-      title
-      address {
-        full
-        dong
-        lat
-        lng
-      }
-      price
-      deposit
-      propertyType
-      area
-      floor
-      totalFloors
-      description
-      photos {
-        id
-        url
-        uploadedAt
-      }
-      reviews {
-        id
-        listingId
-        tenancyPeriod
-        ratings {
-          noise
-          pests
-          winterCold
-          summerHeat
-          landlordResponse
-          overallSatisfaction
-        }
-        pros
-        cons
-        createdAt
-      }
-      trustScore
-      trustSignals {
-        label
-        passed
-        points
-      }
-      broker {
-        id
-        name
-        phone
-      }
-      createdAt
-      updatedAt
-    }
-  }
-`
 
 const propertyTypeLabels: Record<string, string> = {
   STUDIO: '스튜디오',
@@ -79,8 +21,7 @@ type Props = { params: Promise<{ id: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   try {
-    const { data } = await getClient().query<{ listing: Listing | null }>({ query: LISTING_QUERY, variables: { id } })
-    const listing = data?.listing
+    const listing = await fetchListingSSR(id)
     if (!listing) return { title: '매물을 찾을 수 없습니다' }
     return {
       title: `${listing.title} — 집`,
@@ -99,10 +40,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ListingDetailPage({ params }: Props) {
   const { id } = await params
 
-  let listing: Listing | null = null
+  let listing = null
   try {
-    const { data } = await getClient().query<{ listing: Listing | null }>({ query: LISTING_QUERY, variables: { id } })
-    listing = data?.listing ?? null
+    listing = await fetchListingSSR(id)
   } catch (err) {
     console.error('Listing fetch error:', err)
   }

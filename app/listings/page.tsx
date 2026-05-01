@@ -1,62 +1,20 @@
 export const dynamic = 'force-dynamic'
 
-import { getClient } from '@/graphql/apolloClient'
-import { gql } from '@apollo/client'
 import { Listing } from '@/types'
+import { fetchListingsSSR } from '@/lib/queries/serverListings'
 import { ListingGridClient } from '@/components/listings/ListingGridClient'
 import { ListingMapClient } from '@/components/listings/ListingMapClient'
 import { ListingFilterPanel } from '@/components/listings/ListingFilter'
 import { NLSearchBar } from '@/components/search/NLSearchBar'
-
-const LISTINGS_QUERY = gql`
-  query ListingsSSR {
-    listings(page: 1, perPage: 20) {
-      listings {
-        id
-        title
-        address {
-          full
-          dong
-          lat
-          lng
-        }
-        price
-        deposit
-        propertyType
-        area
-        floor
-        totalFloors
-        photos {
-          id
-          url
-          uploadedAt
-        }
-        reviews {
-          id
-        }
-        trustScore
-        trustSignals {
-          label
-          passed
-          points
-        }
-        createdAt
-        updatedAt
-      }
-      totalCount
-      hasNextPage
-    }
-  }
-`
 
 export default async function ListingsPage() {
   let initialListings: Listing[] = []
   let initialTotalCount = 0
 
   try {
-    const result = await getClient().query<{ listings: { listings: Listing[]; totalCount: number } }>({ query: LISTINGS_QUERY })
-    initialListings = result.data?.listings.listings ?? []
-    initialTotalCount = result.data?.listings.totalCount ?? 0
+    const result = await fetchListingsSSR(20)
+    initialListings = result.listings
+    initialTotalCount = result.totalCount
   } catch (err) {
     console.error('SSR listings fetch failed:', err)
   }

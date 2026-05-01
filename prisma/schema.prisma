@@ -21,12 +21,49 @@ model Listing {
   floor        Int?
   totalFloors  Int?
   description  String?
+  // Ingestion metadata
+  source       Source       @default(MANUAL)
+  externalId   String?      // set when imported from an external source
+  isActive     Boolean      @default(true)
+  lastSyncedAt DateTime?
   brokerId     String?
   broker       Broker?      @relation(fields: [brokerId], references: [id])
   photos       Photo[]
   reviews      Review[]
+  priceHistory PriceHistory[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+}
+
+// Price change log for a listing — enables trend detection.
+model PriceHistory {
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  price      Int
+  deposit    Int
+  recordedAt DateTime @default(now())
+}
+
+// Completed real-estate transactions from MOLIT (국토교통부).
+// NOT displayed as listings — used for market price benchmarking in the trust engine.
+model MarketTransaction {
+  id           String       @id @default(cuid())
+  source       Source
+  externalId   String
+  dong         String
+  lat          Float?
+  lng          Float?
+  price        Int          // monthly rent in KRW (0 for 전세)
+  deposit      Int          // deposit in KRW
+  area         Float        // ㎡
+  floor        Int?
+  propertyType PropertyType
+  dealYear     Int
+  dealMonth    Int
+  createdAt    DateTime     @default(now())
+
+  @@unique([source, externalId])
 }
 
 model Review {
@@ -66,4 +103,9 @@ enum PropertyType {
   ONE_ROOM
   TWO_ROOM
   OFFICE_TEL
+}
+
+enum Source {
+  MANUAL
+  MOLIT
 }

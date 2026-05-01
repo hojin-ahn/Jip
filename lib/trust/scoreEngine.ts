@@ -43,17 +43,23 @@ function reviewPresencePoints(reviews: Review[]): { points: number; passed: bool
   return reviews.length > 0 ? { points: 25, passed: true } : { points: 0, passed: false }
 }
 
+export type PricePeer = { price: number }
+
 function marketFitPoints(
   price: number,
   dong: string,
   propertyType: string,
-  allListings: ListingWithRelations[]
+  allListings: ListingWithRelations[],
+  marketPeers?: PricePeer[]
 ): { points: number; passed: boolean } {
-  const peers = allListings.filter(
-    (l) => l.dong === dong && l.propertyType === propertyType
-  )
+  // Prefer MOLIT market data when available (more reliable than listing peers)
+  const peers: PricePeer[] =
+    marketPeers && marketPeers.length >= 3
+      ? marketPeers
+      : allListings.filter((l) => l.dong === dong && l.propertyType === propertyType)
+
   if (peers.length < 3) return { points: 10, passed: true } // Not enough data — give benefit of doubt
-  const prices = peers.map((l) => l.price).sort((a, b) => a - b)
+  const prices = peers.map((p) => p.price).sort((a, b) => a - b)
   const median = prices[Math.floor(prices.length / 2)]
   const within = Math.abs(price - median) / median <= 0.25
   return within ? { points: 10, passed: true } : { points: 0, passed: false }
@@ -62,7 +68,8 @@ function marketFitPoints(
 export function computeTrustScore(
   listing: ListingWithRelations,
   allListings: ListingWithRelations[],
-  isDuplicate: DuplicateCheckFn
+  isDuplicate: DuplicateCheckFn,
+  marketPeers?: PricePeer[]
 ): TrustResult {
   const freshness = freshnessPoints(listing.updatedAt)
   const duplicateCheck = isDuplicate(listing)
@@ -72,7 +79,8 @@ export function computeTrustScore(
     listing.price,
     listing.dong,
     listing.propertyType,
-    allListings
+    allListings,
+    marketPeers
   )
 
   const signals: TrustSignal[] = [
