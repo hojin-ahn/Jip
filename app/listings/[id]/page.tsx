@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getClient } from '@/graphql/apolloClient'
 import { gql } from '@apollo/client'
 import { notFound } from 'next/navigation'
