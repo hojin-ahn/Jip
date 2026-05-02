@@ -1,71 +1,101 @@
-# 집 (Jip) — 신뢰 기반 부동산 플랫폼
+# 집 (Jip) — Trust-First Korean Real Estate Platform
 
-A trust-first real estate platform for the Korean market, tackling fake listings, information asymmetry, and broker-first UX.
+A full-stack real estate web app built for the Korean rental market. The core premise: Korean tenants have no reliable way to know whether a listing is real, fairly priced, or worth visiting. Jip addresses this by computing a **trust score** from five verifiable signals and surfacing **structured resident reviews** — information brokers neither have nor want to share.
+
+**Live demo**: https://jip-eta.vercel.app
 
 ---
 
-## Problem
+## Technologies
 
-Korean real estate platforms suffer from three compounding dysfunctions:
+| Layer | Stack |
+|---|---|
+| Framework | **Next.js 15** (App Router, React 19) |
+| Language | **TypeScript 5** — `strict: true`, no `any` in application code |
+| API | **GraphQL** via Apollo Server v5 + `@as-integrations/next` |
+| GraphQL client | **Apollo Client v4** — `useQuery`, `useLazyQuery`, typed operations |
+| SSR | Next.js Server Components + direct Prisma calls (no internal HTTP) |
+| Database | **PostgreSQL** (Neon serverless) via **Prisma 7** |
+| State | **Zustand** — filter state, map hover/select, mobile view toggle |
+| Map | **Mapbox GL JS** via `react-map-gl` |
+| AI | **OpenAI GPT-4o** — NL search query parsing, review summarization |
+| Real data | **MOLIT (국토교통부) Open API** — ~5,000 real transaction records |
+| Styling | **Tailwind CSS v4** + shadcn/ui |
+| Testing | **Jest** + ts-jest — 9 unit tests on trust score engine |
+| Deployment | **Vercel** (Functions + Cron Jobs) |
 
-1. **Fake listings** — brokers post expired or fabricated listings to generate inquiry calls. There is no reliable signal to distinguish real from fake.
-2. **Information asymmetry** — tenants cannot know whether a neighborhood is noisy, pest-prone, or difficult in winter without living there. Brokers hold all contextual knowledge.
-3. **Broker-first UX** — search surfaces what brokers pay to promote, not what matches a tenant's actual needs.
+---
 
-Jip addresses all three: a computed trust score exposes listing credibility; structured resident reviews surface lived experience; and an AI-powered search bar lets tenants describe what they need in plain language.
+## Key Features
+
+### 1. Trust Score Engine
+Every listing carries a computed score (0–100) from five signals:
+
+| Signal | Points | Logic |
+|---|---|---|
+| Recently updated | 25 | ≤3 days = 25, ≤7 days = 15, older = 0 |
+| No duplicate | 25 | Same address + price within ±10% → deduct 25 |
+| Resident reviews | 25 | At least one review = 25 |
+| Photo recency | 15 | Any photo uploaded within 30 days = 15 |
+| Price market-fit | 10 | Within ±25% of MOLIT transaction median for dong + type |
+
+Tiers: **높음** (80–100) · **보통** (50–79) · **낮음** (0–49). The breakdown is shown per-signal so users know exactly *why* a listing is low-trust, not just that it is.
+
+### 2. Natural Language Search (AI)
+Users type in plain Korean — "마포구 조용한 원룸 60만원 이하" — and the search bar calls a GraphQL query that feeds the input to GPT-4o. The model returns a structured `ParsedFilter` object (dong, propertyType, maxPrice, keywords) that updates the filter state immediately, with debouncing at 600ms.
+
+### 3. SSR + SEO
+Listing index and detail pages use `export const dynamic = 'force-dynamic'` with direct Prisma queries in Server Components. No internal HTTP calls — avoids Vercel deployment protection issues. Trust badges and review counts appear in raw HTML before any JavaScript runs. `generateMetadata` produces per-listing OpenGraph tags.
+
+Verify with:
+```bash
+curl https://jip-eta.vercel.app/listings | grep '<h3'
+```
+
+### 4. Synchronized Map + List
+Two-panel layout: a scrollable listing grid on the left, a Mapbox map on the right. Hovering a card highlights the map pin; clicking a map pin scrolls the grid to that card. Trust score tiers determine pin color (green / amber / red). Infinite scroll via `IntersectionObserver`.
+
+### 5. Responsive Design
+- **Desktop (≥768px)**: Three-panel layout — filter sidebar | listing grid | map
+- **Mobile (<768px)**: Single-panel with a 목록/지도 toggle button and a filter dialog. The filter panel becomes a modal sheet; the map goes full-screen when selected.
+
+### 6. Structured Resident Reviews
+Six-dimension rating system: noise, pests, winter cold, summer heat, landlord response, overall satisfaction. GPT-4o generates a cached summary paragraph from all reviews for a listing (LRU cache, TTL per listing ID). Users submit reviews via a GraphQL mutation with tenancy date range validation.
+
+### 7. Real Data Ingestion Pipeline (MOLIT)
+A background pipeline fetches official Korean government real estate transaction data:
+
+```
+data.go.kr MOLIT API → lib/ingestion/ → MarketTransaction table → trust score price benchmark
+```
+
+- CLI: `npx tsx scripts/syncListings.ts` (bulk load, ~5,000 records in ~3 minutes)
+- Cron: `GET /api/cron/sync-listings` runs daily at 02:00 UTC (Vercel Cron)
+- Upserts by deterministic `externalId` — fully idempotent
 
 ---
 
 ## Architecture Decisions
 
-### Why GraphQL?
+### Why GraphQL over REST?
+The trust score is a computed field composed of multiple signals. GraphQL resolvers make this composable — the client requests `trustScore` and `trustSignals` without knowing how they are computed. The map view fetches only `{ id address { lat lng } trustScore }` while the detail view fetches the full type including nested reviews. No over-fetching.
 
-The trust score is a computed field composed of multiple data sources: listing freshness, photo recency, review presence, duplicate detection, and price market-fit. GraphQL resolvers make this composability natural — a client requests `trustScore` and `trustSignals` and gets the result without knowing how it is computed. REST would require either a dedicated `/trust-score` endpoint or bloating the listing response with fields most views don't need.
-
-GraphQL also enables precise field selection: the map view requests only `{ id address { lat lng } trustScore }` while the detail view requests the full type including nested reviews and broker info. No over-fetching, no under-fetching.
-
-### Why SSR on listing pages?
-
-Listing index and detail pages are the primary SEO surface. A user searching "합정동 원룸 후기" on Google should land directly on a relevant listing with the trust badge and review count visible in the raw HTML. Client-side rendering returns an empty shell to crawlers.
-
-SSR with Apollo cache extraction also eliminates the flash of unstyled content on first load: the trust score badge and review count are visible in the initial HTML before any JavaScript runs. Verify with:
-
-```bash
-curl http://localhost:3000/listings | grep -o '<h3[^>]*>[^<]*</h3>'
-```
+### Why SSR for listing pages?
+A user searching "합정동 원룸 후기" on Naver should land on a page where the trust badge and review count are already in the HTML. Client-side rendering returns an empty shell to crawlers. Server Components calling Prisma directly also avoid the round-trip latency of an internal HTTP call.
 
 ### Why a computed trust score rather than a stored field?
+Storing the score would require re-computing it on every review addition, photo upload, or freshness decay event (the freshness component changes daily without any data change). A computed resolver is always accurate at read time with zero sync complexity.
 
-Storing the trust score would require re-computing and re-persisting it every time a review is added, a photo is uploaded, a duplicate is detected, or time passes (the freshness component decays daily without any data change). A computed resolver approach means the score is always accurate at read time, with no sync bugs or stale values.
-
-The cost is resolver computation on each request. This is acceptable given the lightweight nature of the calculation (five simple checks, no external calls). It is mitigatable with query-level caching if needed at scale.
-
-### Why the trust signal breakdown over a single number?
-
-A number is meaningless without context. "신뢰도 45점" tells a user nothing actionable. "⚠ 후기 없음 · ⚠ 사진 없음 · ✔ 최근 업데이트" tells them exactly why to be cautious and what to verify before visiting. The breakdown is more important than the score.
+### Why MOLIT data for price benchmarking?
+Naver Land has no public API — their internal XHR endpoints require rotating session tokens and explicitly prohibit automated access. MOLIT (국토교통부) provides a free, government-issued API with actual transaction data. This powers the price market-fit trust signal with real numbers instead of listing-peer medians.
 
 ---
 
-## Trust Score Model
-
-| Signal | Points | Logic |
-|---|---|---|
-| Recently updated | 25 | ≤3 days = 25, ≤7 days = 15, older = 0 |
-| No duplicate | 25 | Same address + price ±10% → deduct 25 |
-| Resident reviews | 25 | ≥1 review = 25, none = 0 |
-| Photo recency | 15 | Any photo uploaded ≤30 days = 15 |
-| Price market-fit | 10 | Within ±25% of median for dong + type = 10 |
-
-**Tiers:** 80–100 높음 (High) · 50–79 보통 (Moderate) · 0–49 낮음 (Low)
-
----
-
-## Setup
+## Running Locally
 
 ### Prerequisites
-
-- Docker Desktop (for PostgreSQL)
-- Node.js 18+
+- Node.js 20+
+- Docker Desktop (for local PostgreSQL)
 - OpenAI API key
 - Mapbox public token
 
@@ -73,7 +103,10 @@ A number is meaningless without context. "신뢰도 45점" tells a user nothing 
 
 ```bash
 cp .env.local.example .env.local
-# fill in OPENAI_API_KEY and NEXT_PUBLIC_MAPBOX_TOKEN
+# Fill in:
+#   OPENAI_API_KEY=...
+#   NEXT_PUBLIC_MAPBOX_TOKEN=...
+#   DATABASE_URL=postgresql://jip:jip@localhost:5432/jip   (local Docker)
 ```
 
 ### 2. Database
@@ -90,23 +123,61 @@ npx prisma db seed
 npm run dev
 ```
 
-Visit `http://localhost:3000`.
+Open `http://localhost:3000/listings`.
 
----
-
-## Known Limitations (MVP)
-
-- **No auth** — review submissions use a session token in localStorage. Any user can submit any review. This is a deliberate MVP shortcut; production would require phone-number or OAuth verification.
-- **No image upload** — photos use seeded Unsplash URLs. A production version would use an object storage provider.
-- **Desktop-only** — no responsive layout. The map + list split panel requires ≥1024px width.
-- **LRU cache is in-process** — the review summary cache resets on server restart. A production deployment should use Redis.
-
----
-
-## Tests
+### 4. Tests
 
 ```bash
 npm test
 ```
 
-Nine unit tests covering the trust score engine: perfect score, stale listing, no reviews, duplicate detected, no photos, low-trust tier, moderate tier, and duplicate detection edge cases.
+Nine unit tests covering the trust score engine: perfect score, stale listing, no reviews, duplicate detected, no photos, low-trust tier, moderate tier, and both duplicate detection edge cases.
+
+---
+
+## Project Structure
+
+```
+app/
+  listings/
+    page.tsx              ← SSR listings index (force-dynamic)
+    [id]/page.tsx         ← SSR listing detail with metadata
+    [id]/review/new/      ← Review submission form
+  api/
+    graphql/route.ts      ← Apollo Server endpoint
+    cron/sync-listings/   ← Vercel Cron handler
+
+graphql/
+  schema.ts               ← SDL type definitions
+  resolvers/              ← listing, review, AI resolvers
+
+lib/
+  trust/scoreEngine.ts    ← Pure trust score computation + tests
+  ingestion/              ← MOLIT data pipeline (sources → normalize → persist)
+  queries/serverListings.ts ← SSR data access (Prisma direct)
+  ai/                     ← NL search parser + review summarizer
+
+components/
+  listings/               ← ListingGrid, ListingMap, ListingCard, filters
+  reviews/                ← ReviewForm, ReviewList, ReviewSummary
+  trust/                  ← TrustBadge, TrustSignalList
+
+stores/
+  uiStore.ts              ← Zustand: filter state, hover/select, mobile view
+
+prisma/
+  schema.prisma           ← Listing, Review, Photo, Broker, MarketTransaction
+  seed.ts                 ← 62 listings, 37 reviews, 166 photos (Seoul)
+
+scripts/
+  syncListings.ts         ← MOLIT bulk sync CLI
+```
+
+---
+
+## Known Limitations
+
+- **No auth** — reviews use localStorage tokens. Production would require phone/OAuth verification.
+- **No image upload** — photos are seeded Unsplash URLs. Production would use object storage.
+- **LRU cache is in-process** — review summary cache resets on cold start. Production should use Redis.
+- **MOLIT data is transactions, not listings** — active listing data requires a licensed provider or user/broker submission.

@@ -5,6 +5,7 @@ import { gql } from '@apollo/client'
 import { useUIStore } from '@/stores/uiStore'
 import { ListingMap } from './ListingMap'
 import { Listing, ListingPage } from '@/types'
+import { cn } from '@/lib/utils'
 
 const MAP_LISTINGS_QUERY = gql`
   query MapListings($filter: ListingFilter) {
@@ -48,12 +49,22 @@ const MAP_LISTINGS_QUERY = gql`
 type Props = { initialListings: Listing[] }
 
 export function ListingMapClient({ initialListings }: Props) {
-  const { filter } = useUIStore()
+  const { filter, mobileView } = useUIStore()
   const { data } = useQuery<{ listings: Pick<ListingPage, 'listings'> }>(MAP_LISTINGS_QUERY, {
     variables: { filter },
   })
 
   const listings: Listing[] = data?.listings?.listings ?? initialListings
 
-  return <ListingMap listings={listings} />
+  return (
+    <div
+      className={cn(
+        'flex-1 overflow-hidden',
+        // Mobile: only visible in map view
+        mobileView === 'map' ? 'flex' : 'hidden md:flex'
+      )}
+    >
+      <ListingMap listings={listings} />
+    </div>
+  )
 }

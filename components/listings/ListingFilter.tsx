@@ -3,7 +3,6 @@
 import { useUIStore } from '@/stores/uiStore'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { Button } from '@/components/ui/button'
 import { PropertyType } from '@/types'
 
 const dongs = ['전체', '합정동', '연남동', '성수동', '마포구', '강남구']
@@ -15,11 +14,12 @@ const propertyTypes: { value: PropertyType | ''; label: string }[] = [
   { value: 'OFFICE_TEL', label: '오피스텔' },
 ]
 
-export function ListingFilterPanel() {
+/** Inner filter controls — usable inside either the sidebar or a mobile dialog. */
+export function FilterContent() {
   const { filter, mergeFilter, resetFilter } = useUIStore()
 
   return (
-    <aside className="w-64 shrink-0 space-y-6 p-4 border-r border-gray-200 h-full overflow-y-auto">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-900">필터</h2>
         <button
@@ -37,9 +37,7 @@ export function ListingFilterPanel() {
           {dongs.map((dong) => (
             <button
               key={dong}
-              onClick={() =>
-                mergeFilter({ dong: dong === '전체' ? undefined : dong })
-              }
+              onClick={() => mergeFilter({ dong: dong === '전체' ? undefined : dong })}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                 (dong === '전체' && !filter.dong) || filter.dong === dong
                   ? 'bg-blue-600 text-white border-blue-600'
@@ -59,12 +57,9 @@ export function ListingFilterPanel() {
           {propertyTypes.map(({ value, label }) => (
             <button
               key={label}
-              onClick={() =>
-                mergeFilter({ propertyType: value || undefined })
-              }
+              onClick={() => mergeFilter({ propertyType: value || undefined })}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                (value === '' && !filter.propertyType) ||
-                filter.propertyType === value
+                (value === '' && !filter.propertyType) || filter.propertyType === value
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300'
               }`}
@@ -103,9 +98,7 @@ export function ListingFilterPanel() {
       <div className="space-y-2">
         <Label className="text-sm font-medium">
           최소 신뢰도{' '}
-          <span className="text-blue-600 font-bold">
-            {filter.trustScoreMin ?? 0}점
-          </span>
+          <span className="text-blue-600 font-bold">{filter.trustScoreMin ?? 0}점</span>
         </Label>
         <Slider
           min={0}
@@ -146,6 +139,15 @@ export function ListingFilterPanel() {
           <span>100㎡</span>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Desktop sidebar — hidden on mobile. */
+export function ListingFilterPanel() {
+  return (
+    <aside className="hidden md:block w-64 shrink-0 p-4 border-r border-gray-200 h-full overflow-y-auto">
+      <FilterContent />
     </aside>
   )
 }
