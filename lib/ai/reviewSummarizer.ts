@@ -2,7 +2,11 @@ import OpenAI from 'openai'
 import type { Review } from '../generated/prisma/client'
 import { reviewSummaryCache } from '../cache/lru'
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _client: OpenAI | null = null
+function getClient(): OpenAI {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _client
+}
 
 export async function summarizeReviews(
   listingId: string,
@@ -28,7 +32,7 @@ export async function summarizeReviews(
 
 ${reviewText}`
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 200,

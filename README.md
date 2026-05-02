@@ -4,6 +4,8 @@ A full-stack real estate web app built for the Korean rental market. The core pr
 
 **Live demo**: https://jip-eta.vercel.app
 
+![Listings — desktop three-panel view](docs/screenshots/listings-desktop.png)
+
 ---
 
 ## Technologies
@@ -41,8 +43,12 @@ Every listing carries a computed score (0–100) from five signals:
 
 Tiers: **높음** (80–100) · **보통** (50–79) · **낮음** (0–49). The breakdown is shown per-signal so users know exactly *why* a listing is low-trust, not just that it is.
 
+![Listing detail — trust signals breakdown](docs/screenshots/listing-detail-trust.png)
+
 ### 2. Natural Language Search (AI)
 Users type in plain Korean — "마포구 조용한 원룸 60만원 이하" — and the search bar calls a GraphQL query that feeds the input to GPT-4o. The model returns a structured `ParsedFilter` object (dong, propertyType, maxPrice, keywords) that updates the filter state immediately, with debouncing at 600ms.
+
+![NL search — parsed intent confirmation](docs/screenshots/nl-search.png)
 
 ### 3. SSR + SEO
 Listing index and detail pages use `export const dynamic = 'force-dynamic'` with direct Prisma queries in Server Components. No internal HTTP calls — avoids Vercel deployment protection issues. Trust badges and review counts appear in raw HTML before any JavaScript runs. `generateMetadata` produces per-listing OpenGraph tags.
@@ -59,8 +65,12 @@ Two-panel layout: a scrollable listing grid on the left, a Mapbox map on the rig
 - **Desktop (≥768px)**: Three-panel layout — filter sidebar | listing grid | map
 - **Mobile (<768px)**: Single-panel with a 목록/지도 toggle button and a filter dialog. The filter panel becomes a modal sheet; the map goes full-screen when selected.
 
+![Mobile list view](docs/screenshots/mobile-list.png) ![Mobile map view](docs/screenshots/mobile-map.png)
+
 ### 6. Structured Resident Reviews
 Six-dimension rating system: noise, pests, winter cold, summer heat, landlord response, overall satisfaction. GPT-4o generates a cached summary paragraph from all reviews for a listing (LRU cache, TTL per listing ID). Users submit reviews via a GraphQL mutation with tenancy date range validation.
+
+![Review submission form](docs/screenshots/review-form.png)
 
 ### 7. Real Data Ingestion Pipeline (MOLIT)
 A background pipeline fetches official Korean government real estate transaction data:

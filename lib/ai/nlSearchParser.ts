@@ -1,6 +1,12 @@
 import OpenAI from 'openai'
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Lazy singleton — avoids throwing at module load time when the key is absent,
+// which would otherwise crash the entire /api/graphql route with a 500.
+let _client: OpenAI | null = null
+function getClient(): OpenAI {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _client
+}
 
 export type ListingFilterInput = {
   dong?: string
@@ -24,7 +30,7 @@ Extract a structured filter object with these fields:
 Return JSON only. No prose. No markdown fences.`
 
 export async function parseSearchQuery(query: string): Promise<ListingFilterInput> {
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: 'gpt-4o',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -39,10 +45,17 @@ export async function parseSearchQuery(query: string): Promise<ListingFilterInpu
 
   try {
     const parsed = JSON.parse(content)
-    // Clean up any null/undefined values
-    return Object.fromEntries(
-      Object.entries(parsed).filter(([, v]) => v !== null && v !== undefined)
-    ) as ListingFilterInput
+    // Normalize: drop nulls, join keyword arrays into a single string
+    const cleaned: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v === null || v === undefined) continue
+      if (k === 'keywords' && Array.isArray(v)) {
+        cleaned[k] = v.join(' ')
+      } else {
+        cleaned[k] = v
+      }
+    }
+    return cleaned as ListingFilterInput
   } catch {
     return {}
   }
