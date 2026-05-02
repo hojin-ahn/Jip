@@ -36,7 +36,10 @@ export function NLSearchBar() {
 
   useEffect(() => {
     if (!data?.parseSearchQuery) return
-    const filter: ListingFilter = data.parseSearchQuery
+    // Strip __typename that Apollo Client adds to query results — it's not
+    // a valid field on the ListingFilter input type and causes a 400.
+    const { __typename: _, ...rest } = data.parseSearchQuery as typeof data.parseSearchQuery & { __typename?: string }
+    const filter: ListingFilter = rest
     mergeFilter(filter)
     setNlError(null)
 
