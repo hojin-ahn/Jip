@@ -96,10 +96,13 @@ export function ListingGrid({ initialListings, initialTotalCount, filter }: Prop
   }, [inView, data, networkStatus, filter, fetchMore])
 
   if (error) {
+    console.error('[ListingGrid] query error:', error, JSON.stringify(error, Object.getOwnPropertyNames(error)))
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <p className="text-gray-500">데이터를 불러오는 중 오류가 발생했습니다.</p>
-        <p className="text-xs text-red-400 max-w-xs text-center break-all">{error.message}</p>
+        <p className="text-xs text-red-400 max-w-xs text-center break-all">
+          {(error as unknown as { name?: string })?.name}: {String(error)}
+        </p>
         <Button onClick={() => window.location.reload()} variant="outline">
           다시 시도
         </Button>
