@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@apollo/client/react'
-import { gql } from '@apollo/client'
+import { gql, NetworkStatus } from '@apollo/client'
 import { useInView } from 'react-intersection-observer'
 import { Listing, ListingFilter, ListingPage } from '@/types'
 import { ListingCard } from './ListingCard'
@@ -61,7 +61,7 @@ export function ListingGrid({ initialListings, initialTotalCount, filter }: Prop
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const { selectedListingId, resetFilter } = useUIStore()
 
-  const { data, loading, error, fetchMore } = useQuery<{ listings: ListingPage }>(LISTINGS_QUERY, {
+  const { data, loading, error, fetchMore, networkStatus } = useQuery<{ listings: ListingPage }>(LISTINGS_QUERY, {
     variables: { filter, page: 1, perPage: 20 },
     notifyOnNetworkStatusChange: true,
   })
@@ -76,7 +76,7 @@ export function ListingGrid({ initialListings, initialTotalCount, filter }: Prop
   const { ref: sentinelRef, inView } = useInView({ threshold: 0.1 })
 
   useEffect(() => {
-    if (!inView || !data?.listings?.hasNextPage || loading) return
+    if (!inView || !data?.listings?.hasNextPage || networkStatus !== NetworkStatus.ready) return
     const currentPage = Math.ceil(data.listings.listings.length / 20)
     fetchMore({
       variables: { filter, page: currentPage + 1, perPage: 20 },
@@ -93,7 +93,7 @@ export function ListingGrid({ initialListings, initialTotalCount, filter }: Prop
         }
       },
     })
-  }, [inView, data, loading, filter, fetchMore])
+  }, [inView, data, networkStatus, filter, fetchMore])
 
   if (error) {
     return (
