@@ -33,7 +33,7 @@ export default async function ListingsPage() {
       </header>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden h-full">
         {/* Desktop filter sidebar */}
         <ListingFilterPanel />
         {/* Listing grid: full-width on mobile list view, 320px on desktop */}

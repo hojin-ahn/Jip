@@ -59,7 +59,7 @@ export function ListingMapClient({ initialListings }: Props) {
   return (
     <div
       className={cn(
-        'flex-1 overflow-hidden',
+        'flex-1 overflow-hidden h-full',
         // Mobile: only visible in map view
         mobileView === 'map' ? 'flex' : 'hidden md:flex'
       )}

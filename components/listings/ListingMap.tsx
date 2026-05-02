@@ -36,7 +36,7 @@ export function ListingMap({ listings }: Props) {
   }
 
   return (
-    <div className="flex-1 h-full">
+    <div className="w-full h-full">
       <Map
         mapboxAccessToken={token}
         initialViewState={{
